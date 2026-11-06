@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  METAFLOW_USER: ci
+
+jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          uv venv
+          uv pip install . --group test --group lint
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync mypy metaflow_extensions
+
+  test:
+    name: Metaflow ${{ matrix.metaflow }} / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { metaflow: "2.13.0", python: "3.10" }
+          - { metaflow: "2.*", python: "3.10" }
+          - { metaflow: "2.*", python: "3.13" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      # The built wheel, not an editable install: Metaflow only discovers
+      # extensions from an installed distribution's top_level.txt.
+      - run: uv build --wheel --out-dir dist
+      - name: Install
+        run: |
+          uv venv
+          uv pip install dist/*.whl --group test "metaflow==${{ matrix.metaflow }}"
+      - run: uv run --no-sync pytest
+      - name: Example flow validates
+        run: uv run --no-sync python examples/web_research_flow.py --quiet show
+
+  build:
+    name: Build and install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build --out-dir dist
+      - run: uvx twine check --strict dist/*
+      - name: Install the wheel
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke dist/*.whl
+          cd /tmp
+          /tmp/smoke/bin/python -c "
+          from metaflow import AnakinClient, anakin, get_anakin_calls
+          from metaflow.plugins.cards.card_modules import MF_EXTERNAL_CARDS
+          assert [c.type for c in MF_EXTERNAL_CARDS] == ['anakin_calls']
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7

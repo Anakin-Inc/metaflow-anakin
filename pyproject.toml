@@ -1,0 +1,77 @@
+[build-system]
+# setuptools, not hatchling: Metaflow finds extensions through the wheel's
+# top_level.txt, which only setuptools writes.
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metaflow-anakin"
+version = "0.1.0"
+description = "Metaflow step decorator and card for Anakin: scrape, crawl, search, Wire site actions, website monitors and AI browser tasks"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Anakin", email = "support@anakin.io" }]
+keywords = ["metaflow", "metaflow-extension", "anakin", "web-scraping", "crawler", "web-data"]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: System :: Distributed Computing",
+]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "metaflow>=2.13.0,<3.0.0",
+    "anakin-sdk>=0.2.0,<0.3.0",
+    # Only browser_task calls the API directly (POST /ai/evaluate isn't in
+    # anakin-sdk yet); same floor anakin-sdk pins.
+    "httpx>=0.27.0",
+]
+
+[project.urls]
+Homepage = "https://anakin.io"
+Documentation = "https://anakin.io/docs/integrations/workflow/metaflow"
+Repository = "https://github.com/Anakin-Inc/metaflow-anakin"
+Issues = "https://github.com/Anakin-Inc/metaflow-anakin/issues"
+Changelog = "https://github.com/Anakin-Inc/metaflow-anakin/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+    "pytest>=8.0.0,<9.0.0",
+]
+lint = [
+    "ruff>=0.6",
+    "mypy>=1.10.0,<2.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["metaflow_extensions.*"]
+namespaces = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "UP031"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["anakin", "metaflow"]
+
+[tool.pytest.ini_options]
+# importlib mode and no repo root on sys.path: Metaflow refuses to load an extension it
+# finds twice (the installed wheel and the source tree).
+addopts = "--strict-markers --strict-config --import-mode=importlib"
+pythonpath = ["tests"]
+testpaths = ["tests"]
+
+[tool.mypy]
+disallow_untyped_defs = true
+namespace_packages = true
+explicit_package_bases = true
+ignore_missing_imports = true
